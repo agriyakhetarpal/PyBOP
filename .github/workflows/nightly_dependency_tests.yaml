@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 23 * * 1"
+  pull_request:
 
 concurrency:
   # github.workflow: name of the workflow, so that we don't cancel other workflows
@@ -30,19 +31,34 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: |
-          python -m pip install -e .[all,dev]
-          python -m pip uninstall -y pybamm
-          python -m pip install "pybamm[all] @ git+https://github.com/pybamm-team/PyBaMM@develop"
-
+          python -m pip install -e ".[all,dev]"
+          python -m pip install "pybamm[all] @ git+https://github.com/pybamm-team/PyBaMM@develop" --force-reinstall
+          pip install pytest-reportlog
 
       - name: Run ${{ matrix.suite }} tests
+        id: test-suite
         run: |
           if [[ "${{ matrix.suite }}" == "unit" ]]; then
-              python -m pytest --unit
+              python -m pytest --unit --report-log=pytest-log-unit.jsonl
           elif [[ "${{ matrix.suite }}" == "integration" ]]; then
-              python -m pytest --integration
+              python -m pytest --integration --report-log=pytest-log-integration.jsonl
           elif [[ "${{ matrix.suite }}" == "examples" ]]; then
-              python -m pytest --nbmake --examples
+              python -m pytest --nbmake --examples --report-log=pytest-log-examples.jsonl
           fi
+
+      - name: Create issue(s) if tests fail
+        # github.repository == 'pybop-team/PyBOP'
+        if: >-
+          failure() &&
+          steps.test-suite.outcome == 'failure'
+        uses: xarray-contrib/issue-from-pytest-log@v1.2.8
+        with:
+          # Ensure that different matrix jobs don't overwrite each other's issues
+          # and that a unique issue is created. This is because the action does not
+          # allow adding a comment to an existing issue
+          issue-title: "Nightly tests: ${{ matrix.os }}-${{ matrix.suite }} tests failed"
+          issue-label: "nightly tests"
+          log-path: pytest-log-${{ matrix.suite }}.jsonl
