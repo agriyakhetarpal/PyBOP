@@ -25,3 +25,5 @@ class TestExamples:
     @pytest.mark.examples
     def test_example_scripts(self, example):
         runpy.run_path(example)
+        # fail the tests for debugging
+        assert False

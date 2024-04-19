@@ -83,6 +83,8 @@ class TestModelAndExperimentChanges:
         # The datasets are not corrupted so the costs should be zero
         np.testing.assert_almost_equal(cost_1, 0)
         np.testing.assert_almost_equal(cost_2, 0)
+        # fail the test for debugging
+        assert False
 
     def final_cost(self, solution, model, parameters, init_soc):
         # Compute the cost corresponding to a particular solution
